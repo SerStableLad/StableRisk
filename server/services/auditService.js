@@ -64,10 +64,15 @@ export async function getAuditHistory(ticker, name, repoUrl) {
       );
     });
 
-    // Get file contents and metadata for each audit file
-    const eightMonthsAgo = getEightMonthsAgo();
+    if (auditFiles.length === 0) {
+      return [];
+    }
 
+    // Get file contents and metadata for each audit file
     const audits = [];
+    const eightMonthsAgo = getEightMonthsAgo();
+    let hasRecentAudit = false;
+
     for (const file of auditFiles) {
       try {
         // Get file metadata
@@ -81,29 +86,31 @@ export async function getAuditHistory(ticker, name, repoUrl) {
         if (fileResponse.data.length > 0) {
           const commitDate = new Date(fileResponse.data[0].commit.committer.date);
           
-          // Only include audits from the last 8 months
+          // Check if this is a recent audit
           if (commitDate >= eightMonthsAgo) {
-            // Get file content for .md and .txt files
-            let summary = '';
-            if (file.path.endsWith('.md') || file.path.endsWith('.txt')) {
-              const contentResponse = await githubClient.get(`/repos/${owner}/${repo}/contents/${file.path}`);
-              const content = Buffer.from(contentResponse.data.content, 'base64').toString();
-              summary = extractSummary(content);
-            }
-
-            audits.push({
-              firm: extractAuditFirm(file.path),
-              date: commitDate.toISOString(),
-              summary: summary || `Audit report: ${file.path}`,
-              link: `${repoUrl}/blob/main/${file.path}`,
-              issues: {
-                critical: 0, // These would need to be parsed from the content
-                high: 0,
-                medium: 0,
-                low: 0
-              }
-            });
+            hasRecentAudit = true;
           }
+
+          // Get file content for .md and .txt files
+          let summary = '';
+          if (file.path.endsWith('.md') || file.path.endsWith('.txt')) {
+            const contentResponse = await githubClient.get(`/repos/${owner}/${repo}/contents/${file.path}`);
+            const content = Buffer.from(contentResponse.data.content, 'base64').toString();
+            summary = extractSummary(content);
+          }
+
+          audits.push({
+            firm: extractAuditFirm(file.path),
+            date: commitDate.toISOString(),
+            summary: summary || `Audit report: ${file.path}`,
+            link: `${repoUrl}/blob/main/${file.path}`,
+            issues: {
+              critical: 0,
+              high: 0,
+              medium: 0,
+              low: 0
+            }
+          });
         }
       } catch (error) {
         console.error(`Error processing audit file ${file.path}:`, error.message);
@@ -113,8 +120,18 @@ export async function getAuditHistory(ticker, name, repoUrl) {
     // Sort audits by date (newest first)
     audits.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    cache.set(cacheKey, audits);
-    return audits;
+    // If there are no recent audits, return the most recent audit
+    if (!hasRecentAudit && audits.length > 0) {
+      return [audits[0]];
+    }
+
+    // If there are recent audits, return all audits from the last 8 months
+    if (hasRecentAudit) {
+      return audits.filter(audit => new Date(audit.date) >= eightMonthsAgo);
+    }
+
+    // Return the most recent audit if no other conditions are met
+    return audits.length > 0 ? [audits[0]] : [];
   } catch (error) {
     console.error('Error fetching audit history:', error.message);
     return [];
