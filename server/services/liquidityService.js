@@ -1,6 +1,6 @@
 import axios from 'axios';
 import NodeCache from 'node-cache';
-import cheerio from 'cheerio';
+import * as cheerio from 'cheerio';
 
 const cache = new NodeCache({ stdTTL: 3600, checkperiod: 600 });
 
