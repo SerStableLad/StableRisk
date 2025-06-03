@@ -29,67 +29,12 @@ coinGeckoClient.interceptors.response.use(null, async error => {
   return Promise.reject(error);
 });
 
-// Keywords that indicate a bridged or wrapped token
-const BRIDGE_KEYWORDS = [
-  'bridged',
-  'wrapped',
-  'bridge',
-  'bsc',
-  'polygon',
-  'avalanche',
-  'arbitrum',
-  'optimism',
-  'bnb',
-  'wormhole',
-  'portal',
-  'multichain',
-  'anyswap',
-  'binance-peg',
-  'harmony',
-  'fantom'
-];
-
-// Native token identifiers
-const NATIVE_KEYWORDS = [
-  'native',
-  'original',
-  'mainnet',
-  'ethereum'
-];
-
 /**
- * Checks if a coin is likely a bridged version
+ * Checks if a coin is a bridged version by looking at its name
  */
 function isBridgedToken(coin) {
-  const nameAndId = (coin.name + ' ' + coin.id).toLowerCase();
-  return BRIDGE_KEYWORDS.some(keyword => nameAndId.includes(keyword));
-}
-
-/**
- * Scores a coin based on how likely it is to be the native version
- * Higher score = more likely to be native
- */
-function getNativeScore(coin) {
-  const nameAndId = (coin.name + ' ' + coin.id).toLowerCase();
-  let score = 0;
-
-  // Prefer coins with native keywords
-  NATIVE_KEYWORDS.forEach(keyword => {
-    if (nameAndId.includes(keyword)) score += 2;
-  });
-
-  // Penalize coins with bridge keywords
-  BRIDGE_KEYWORDS.forEach(keyword => {
-    if (nameAndId.includes(keyword)) score -= 2;
-  });
-
-  // Prefer shorter IDs (usually indicates original token)
-  score += 5 - Math.min(coin.id.length / 10, 5);
-
-  // Prefer ethereum platform
-  if (coin.platforms && coin.platforms.ethereum) score += 2;
-
-  return score;
+  const name = coin.name.toLowerCase();
+  return name.includes('bridged') || name.includes('bridge');
 }
 
 /**
@@ -105,32 +50,20 @@ export async function fetchCoinInfo(ticker) {
   
   try {
     // First get the coin ID from the ticker
-    const coinsListResponse = await coinGeckoClient.get('/coins/list', {
-      params: {
-        include_platform: true
-      }
-    });
+    const coinsListResponse = await coinGeckoClient.get('/coins/list');
     const coinsList = coinsListResponse.data;
     
-    // Find all coins matching the ticker
+    // Find matching coins that aren't bridged versions
     const matchingCoins = coinsList.filter(c => 
-      c.symbol.toLowerCase() === ticker.toLowerCase()
+      c.symbol.toLowerCase() === ticker.toLowerCase() && !isBridgedToken(c)
     );
 
     if (matchingCoins.length === 0) {
       throw new Error(`Stablecoin ${ticker} not found`);
     }
 
-    // Sort by native score (highest first)
-    matchingCoins.sort((a, b) => getNativeScore(b) - getNativeScore(a));
-
-    // Get the most likely native token
+    // Use the first non-bridged match
     const coin = matchingCoins[0];
-
-    // If it looks like a bridged token, check if there are only bridged versions
-    if (isBridgedToken(coin)) {
-      throw new Error(`Only bridged versions of ${ticker} were found. Please search for the native token.`);
-    }
     
     // Get detailed coin info
     const coinInfoResponse = await coinGeckoClient.get(
