@@ -116,28 +116,36 @@ const RiskReport: React.FC<RiskReportProps> = ({ report }) => {
                   <span className="text-gray-500">Blockchain:</span>{' '}
                   <span className="font-medium">{coinInfo.blockchain}</span>
                 </div>
-                <div className="col-span-2 flex flex-col sm:flex-row gap-4">
+                <div className="col-span-2 space-y-2">
                   {coinInfo.website && (
-                    <a
-                      href={coinInfo.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-800 hover:underline"
-                    >
-                      {new URL(coinInfo.website).hostname}
-                    </a>
+                    <div>
+                      <span className="text-gray-500">Website:</span>{' '}
+                      <a
+                        href={coinInfo.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        {new URL(coinInfo.website).hostname}
+                      </a>
+                    </div>
                   )}
-                  {coinInfo.github && (
-                    <a
-                      href={coinInfo.github}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center text-blue-600 hover:text-blue-800"
-                    >
-                      <Github className="h-4 w-4 mr-1" />
-                      GitHub
-                    </a>
-                  )}
+                  <div>
+                    <span className="text-gray-500">GitHub:</span>{' '}
+                    {coinInfo.github ? (
+                      <a
+                        href={coinInfo.github}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        <Github className="h-4 w-4 mr-1" />
+                        View Repository
+                      </a>
+                    ) : (
+                      <span className="text-gray-400">No repository found</span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
