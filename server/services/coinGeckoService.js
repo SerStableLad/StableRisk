@@ -46,7 +46,12 @@ const BRIDGE_KEYWORDS = [
   'anyswap',
   'binance-peg',
   'harmony',
-  'fantom'
+  'fantom',
+  'arbitrum-one',
+  'layer2',
+  'l2',
+  'pegged',
+  'synthetic'
 ];
 
 // Native token identifiers
@@ -54,15 +59,24 @@ const NATIVE_KEYWORDS = [
   'native',
   'original',
   'mainnet',
-  'ethereum'
+  'ethereum',
+  'core'
+];
+
+// Platforms in order of preference (ethereum first)
+const PLATFORM_PREFERENCE = [
+  'ethereum',
+  'tron',
+  'bitcoin',
+  'solana'
 ];
 
 /**
  * Checks if a coin is likely a bridged version
  */
 function isBridgedToken(coin) {
-  const nameAndId = (coin.name + ' ' + coin.id).toLowerCase();
-  return BRIDGE_KEYWORDS.some(keyword => nameAndId.includes(keyword));
+  const nameAndId = (coin.name + ' ' + coin.id + ' ' + Object.keys(coin.platforms || {}).join(' ')).toLowerCase();
+  return BRIDGE_KEYWORDS.some(keyword => nameAndId.includes(keyword.toLowerCase()));
 }
 
 /**
@@ -73,21 +87,33 @@ function getNativeScore(coin) {
   const nameAndId = (coin.name + ' ' + coin.id).toLowerCase();
   let score = 0;
 
+  // Immediately disqualify if it has bridge keywords in the name
+  if (isBridgedToken(coin)) {
+    return -100;
+  }
+
   // Prefer coins with native keywords
   NATIVE_KEYWORDS.forEach(keyword => {
-    if (nameAndId.includes(keyword)) score += 2;
+    if (nameAndId.includes(keyword.toLowerCase())) score += 3;
   });
 
-  // Penalize coins with bridge keywords
-  BRIDGE_KEYWORDS.forEach(keyword => {
-    if (nameAndId.includes(keyword)) score -= 2;
-  });
+  // Platform preference scoring
+  const platforms = Object.keys(coin.platforms || {});
+  if (platforms.length > 0) {
+    const platformIndex = PLATFORM_PREFERENCE.findIndex(p => platforms.includes(p));
+    if (platformIndex !== -1) {
+      score += (PLATFORM_PREFERENCE.length - platformIndex) * 2;
+    }
+  }
 
   // Prefer shorter IDs (usually indicates original token)
   score += 5 - Math.min(coin.id.length / 10, 5);
 
-  // Prefer ethereum platform
-  if (coin.platforms && coin.platforms.ethereum) score += 2;
+  // Penalize if "wrapped" or "bridged" appears in the description
+  if (coin.description?.toLowerCase().includes('wrapped') || 
+      coin.description?.toLowerCase().includes('bridged')) {
+    score -= 5;
+  }
 
   return score;
 }
@@ -124,12 +150,17 @@ export async function fetchCoinInfo(ticker) {
     // Sort by native score (highest first)
     matchingCoins.sort((a, b) => getNativeScore(b) - getNativeScore(a));
 
-    // Get the most likely native token
+    // Get the highest scored coin
     const coin = matchingCoins[0];
 
-    // If it looks like a bridged token, check if there are only bridged versions
+    // If it looks like a bridged token, check if there are any native versions
     if (isBridgedToken(coin)) {
-      throw new Error(`Only bridged versions of ${ticker} were found. Please search for the native token.`);
+      const nativeVersions = matchingCoins.filter(c => !isBridgedToken(c));
+      if (nativeVersions.length > 0) {
+        coin = nativeVersions[0];
+      } else {
+        throw new Error(`Only bridged versions of ${ticker} were found. Please search for the native token.`);
+      }
     }
     
     // Get detailed coin info
