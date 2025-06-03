@@ -8,31 +8,51 @@ const cache = new NodeCache({ stdTTL: 3600, checkperiod: 600 }); // Cache for 1 
 const COINGECKO_API = 'https://api.coingecko.com/api/v3';
 const API_KEY = process.env.COINGECKO_API_KEY;
 
+// Validate API key
+if (!API_KEY) {
+  console.error('CoinGecko API key is missing. Please set COINGECKO_API_KEY in .env');
+}
+
 // Configure axios instance for CoinGecko
 const coinGeckoClient = axios.create({
   baseURL: COINGECKO_API,
   headers: {
     'x-cg-pro-api-key': API_KEY
   },
-  timeout: 10000,
-  maxRetries: 3,
-  retryDelay: 1000
+  timeout: 10000
 });
 
-// Add response interceptor for rate limiting
+// Add retry logic for failed requests
 coinGeckoClient.interceptors.response.use(null, async error => {
+  const config = error.config;
+  config.retryCount = config.retryCount || 0;
+  
+  if (config.retryCount >= 3) {
+    return Promise.reject(error);
+  }
+  
+  config.retryCount += 1;
+  
   if (error.response?.status === 429) {
     const retryAfter = parseInt(error.response.headers['retry-after']) || 60;
     await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
-    return coinGeckoClient.request(error.config);
+    return coinGeckoClient.request(config);
   }
-  return Promise.reject(error);
+  
+  // Retry with exponential backoff
+  const delay = Math.pow(2, config.retryCount) * 1000;
+  await new Promise(resolve => setTimeout(resolve, delay));
+  return coinGeckoClient.request(config);
 });
 
 /**
  * Fetches basic coin information from CoinGecko API
  */
 export async function fetchCoinInfo(ticker) {
+  if (!ticker) {
+    throw new Error('Ticker is required');
+  }
+  
   const cacheKey = `coin_info_${ticker.toLowerCase()}`;
   const cachedData = cache.get(cacheKey);
   
@@ -94,10 +114,16 @@ export async function fetchCoinInfo(ticker) {
     return coinInfo;
   } catch (error) {
     console.error('CoinGecko API error:', error.message);
-    if (axios.isAxiosError(error) && error.response?.status === 429) {
-      throw new Error('CoinGecko API rate limit exceeded. Please try again in a few minutes.');
+    
+    if (axios.isAxiosError(error)) {
+      if (error.response?.status === 429) {
+        throw new Error('CoinGecko API rate limit exceeded. Please try again in a few minutes.');
+      } else if (error.response?.status === 403) {
+        throw new Error('Invalid or missing CoinGecko API key. Please check your configuration.');
+      }
     }
-    throw error;
+    
+    throw new Error('Failed to fetch stablecoin data from CoinGecko');
   }
 }
 
