@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Download, Share2, Globe, Github } from 'lucide-react';
+import { Download, Share2, Github } from 'lucide-react';
 import RiskMeter from './RiskMeter';
 import RiskFactorCard from './RiskFactorCard';
 import PegStabilityChart from './PegStabilityChart';
@@ -116,16 +116,15 @@ const RiskReport: React.FC<RiskReportProps> = ({ report }) => {
                   <span className="text-gray-500">Blockchain:</span>{' '}
                   <span className="font-medium">{coinInfo.blockchain}</span>
                 </div>
-                <div className="flex items-center space-x-4">
+                <div className="col-span-2 flex flex-col sm:flex-row gap-4">
                   {coinInfo.website && (
                     <a
                       href={coinInfo.website}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center text-blue-600 hover:text-blue-800"
+                      className="text-blue-600 hover:text-blue-800 hover:underline"
                     >
-                      <Globe className="h-4 w-4 mr-1" />
-                      Website
+                      {new URL(coinInfo.website).hostname}
                     </a>
                   )}
                   {coinInfo.github && (
