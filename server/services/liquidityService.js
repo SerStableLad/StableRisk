@@ -6,11 +6,19 @@ const cache = new NodeCache({ stdTTL: 3600, checkperiod: 600 });
 
 async function findGithubFromWebsite(websiteUrl) {
   try {
-    const response = await axios.get(websiteUrl, {
-      timeout: 5000,
+    // Normalize website URL
+    const normalizedUrl = websiteUrl.startsWith('http') ? websiteUrl : `https://${websiteUrl}`;
+    
+    const response = await axios.get(normalizedUrl, {
+      timeout: 10000, // Increased timeout
+      maxRedirects: 5,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      }
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br'
+      },
+      validateStatus: status => status < 400 // Accept redirects
     });
     
     const $ = cheerio.load(response.data);
@@ -18,24 +26,32 @@ async function findGithubFromWebsite(websiteUrl) {
     // Look for GitHub links in various ways
     const githubLinks = new Set();
     
-    // Direct GitHub links
-    $('a[href*="github.com"]').each((_, el) => {
+    // Direct GitHub links with improved selector
+    $('a[href*="github.com"], a[href*="GITHUB.COM"]').each((_, el) => {
       const href = $(el).attr('href');
-      if (href && !href.includes('github.io')) {
+      if (href && !href.includes('github.io') && !href.includes('/issues')) {
         githubLinks.add(href);
       }
     });
     
-    // Social media icons/links
-    $('a[class*="github"], a[class*="social"]').each((_, el) => {
+    // Social media icons/links with common class names
+    $('a[class*="github"], a[class*="social"], a[class*="Git"], [aria-label*="GitHub"]').each((_, el) => {
       const href = $(el).attr('href');
       if (href && href.includes('github.com') && !href.includes('github.io')) {
         githubLinks.add(href);
       }
     });
     
-    // Footer links
-    $('footer a[href*="github.com"]').each((_, el) => {
+    // Look for meta tags
+    $('meta[content*="github.com"]').each((_, el) => {
+      const content = $(el).attr('content');
+      if (content && content.includes('github.com') && !content.includes('github.io')) {
+        githubLinks.add(content);
+      }
+    });
+    
+    // Also check for links in documentation/developer sections
+    $('div[class*="docs"], div[class*="developer"], div[class*="resources"]').find('a[href*="github.com"]').each((_, el) => {
       const href = $(el).attr('href');
       if (href && !href.includes('github.io')) {
         githubLinks.add(href);
@@ -46,14 +62,22 @@ async function findGithubFromWebsite(websiteUrl) {
     const validGithubLinks = Array.from(githubLinks)
       .map(url => {
         try {
+          // Handle relative URLs
+          const fullUrl = url.startsWith('http') ? url : new URL(url, normalizedUrl).href;
+          
           // Normalize URL
-          const cleanUrl = url.trim()
+          const cleanUrl = fullUrl.trim()
             .replace(/\/$/, '') // Remove trailing slash
             .replace(/\/+$/, '') // Remove multiple trailing slashes
-            .replace('http:', 'https:'); // Use HTTPS
+            .replace('http:', 'https:') // Use HTTPS
+            .split('#')[0] // Remove hash
+            .split('?')[0]; // Remove query params
           
           // Ensure it's a valid GitHub repository URL
-          if (cleanUrl.match(/github\.com\/[^/]+\/[^/]+$/)) {
+          // Match organization/user repos: github.com/org/repo
+          // Match organization repos: github.com/orgs/org/repositories
+          if (cleanUrl.match(/github\.com\/[^/]+\/[^/]+$/) || 
+              cleanUrl.match(/github\.com\/orgs\/[^/]+\/repositories$/)) {
             return cleanUrl;
           }
         } catch (e) {
@@ -62,6 +86,29 @@ async function findGithubFromWebsite(websiteUrl) {
         return null;
       })
       .filter(Boolean);
+    
+    // If we found an orgs URL, try to get the main repository
+    const orgsUrl = validGithubLinks.find(url => url.includes('/orgs/'));
+    if (orgsUrl && !validGithubLinks.some(url => url.match(/github\.com\/[^/]+\/[^/]+$/))) {
+      try {
+        const orgResponse = await axios.get(orgsUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          }
+        });
+        const $org = cheerio.load(orgResponse.data);
+        
+        // Look for pinned repositories
+        $org('a[href*="/repositories"]').each((_, el) => {
+          const href = $org(el).attr('href');
+          if (href && href.match(/\/[^/]+\/[^/]+$/)) {
+            validGithubLinks.push(`https://github.com${href}`);
+          }
+        });
+      } catch (error) {
+        console.warn('Error fetching organization page:', error.message);
+      }
+    }
     
     return validGithubLinks[0] || '';
   } catch (error) {
