@@ -17,6 +17,9 @@ const githubClient = axios.create({
   }
 });
 
+// Current date constant
+const CURRENT_DATE = new Date('2025-06-03');
+
 /**
  * Gets audit history for a stablecoin
  * @param {string} ticker - The stablecoin ticker
@@ -64,7 +67,7 @@ export async function getAuditHistory(ticker, name, repoUrl) {
     });
 
     // Get file contents and metadata for each audit file
-    const eightMonthsAgo = new Date();
+    const eightMonthsAgo = new Date(CURRENT_DATE);
     eightMonthsAgo.setMonth(eightMonthsAgo.getMonth() - 8);
 
     const audits = [];

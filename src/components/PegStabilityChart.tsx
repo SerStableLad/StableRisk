@@ -24,6 +24,9 @@ ChartJS.register(
   Legend
 );
 
+// Current date constant
+const CURRENT_DATE = new Date('2025-06-03');
+
 interface PegStabilityChartProps {
   pegEvents: PegEvent[];
   launchDate: string;
@@ -129,7 +132,7 @@ const PegStabilityChart: React.FC<PegStabilityChartProps> = ({ pegEvents, launch
   }, 0) / pegEvents.length;
 
   const daysListed = Math.ceil(
-    (new Date().getTime() - new Date(launchDate).getTime()) / (1000 * 60 * 60 * 24)
+    (CURRENT_DATE.getTime() - new Date(launchDate).getTime()) / (1000 * 60 * 60 * 24)
   );
 
   return (
