@@ -7,9 +7,21 @@ import { getAuditHistory } from '../services/auditService.js';
 import { analyzePegStability } from '../services/pegService.js';
 import { checkTransparency } from '../services/transparencyService.js';
 import { calculateRiskScore } from '../services/scoringEngine.js';
+import { clearAllCaches } from '../utils/clearCache.js';
 
 const router = express.Router();
 const cache = new NodeCache({ stdTTL: 3600, checkperiod: 600 });
+
+// Add cache clear endpoint
+router.post('/clear-cache', (req, res) => {
+  try {
+    clearAllCaches();
+    cache.flushAll();
+    res.json({ message: 'Cache cleared successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error clearing cache', error: error.message });
+  }
+});
 
 router.get('/:ticker', async (req, res, next) => {
   try {
@@ -79,7 +91,8 @@ router.get('/:ticker', async (req, res, next) => {
     // Add discrepancies to the report
     const fullReport = {
       ...riskReport,
-      discrepancies
+      discrepancies,
+      transparencyInfo: transparencyScore.transparencyInfo
     };
     
     cache.set(cacheKey, fullReport);

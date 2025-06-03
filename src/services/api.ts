@@ -28,3 +28,15 @@ export async function fetchStablecoinRiskReport(ticker: string): Promise<RiskRep
     throw new Error('An unexpected error occurred');
   }
 }
+
+/**
+ * Clears all caches (both server and client)
+ */
+export async function clearCache(): Promise<void> {
+  try {
+    await axios.post(`${API_BASE_URL}/api/stablecoins/clear-cache`);
+  } catch (error) {
+    console.error('Error clearing cache:', error);
+    throw new Error('Failed to clear cache');
+  }
+}
