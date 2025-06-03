@@ -1,7 +1,7 @@
 import express from 'express';
 import NodeCache from 'node-cache';
 import { fetchCoinInfo } from '../services/coinGeckoService.js';
-import { getLiquidityData } from '../services/liquidityService.js';
+import { getLiquidityData, getGithubUrl } from '../services/liquidityService.js';
 import { analyzeGithubRepo } from '../services/githubService.js';
 import { getAuditHistory } from '../services/auditService.js';
 import { analyzePegStability } from '../services/pegService.js';
@@ -22,8 +22,8 @@ router.get('/:ticker', async (req, res, next) => {
       return res.json(cachedData);
     }
     
-    // Fetch data from both CoinGecko and DeFiLlama
-    const [coinInfo, liquidityData] = await Promise.all([
+    // Fetch initial data
+    const [coinInfo, { liquidityData }] = await Promise.all([
       fetchCoinInfo(ticker),
       getLiquidityData(ticker)
     ]);
@@ -31,6 +31,10 @@ router.get('/:ticker', async (req, res, next) => {
     if (!coinInfo) {
       return res.status(404).json({ message: `Stablecoin ${ticker} not found` });
     }
+
+    // Get GitHub URL from DeFiLlama or website
+    const githubUrl = await getGithubUrl(coinInfo.website, ticker);
+    coinInfo.github = githubUrl;
     
     // Cross-validate data between sources
     const discrepancies = [];
@@ -53,9 +57,9 @@ router.get('/:ticker', async (req, res, next) => {
     let githubData = null;
     let auditHistory = [];
     
-    if (coinInfo.github) {
+    if (githubUrl) {
       [githubData, auditHistory] = await Promise.all([
-        analyzeGithubRepo(coinInfo.github),
+        analyzeGithubRepo(githubUrl),
         getAuditHistory(ticker, coinInfo.name)
       ]);
     }
