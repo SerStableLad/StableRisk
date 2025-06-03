@@ -33,7 +33,6 @@ coinGeckoClient.interceptors.response.use(null, async error => {
 const BRIDGE_KEYWORDS = [
   'bridged',
   'wrapped',
-  'peg',
   'bridge',
   'bsc',
   'polygon',
