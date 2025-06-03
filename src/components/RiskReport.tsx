@@ -116,10 +116,6 @@ const RiskReport: React.FC<RiskReportProps> = ({ report }) => {
                   <span className="text-gray-500">Blockchain:</span>{' '}
                   <span className="font-medium">{coinInfo.blockchain}</span>
                 </div>
-                <div>
-                  <span className="text-gray-500">Price Feed:</span>{' '}
-                  <span className="font-medium">{coinInfo.priceFeed || 'Not available'}</span>
-                </div>
                 <div className="flex items-center space-x-4">
                   {coinInfo.website && (
                     <a
