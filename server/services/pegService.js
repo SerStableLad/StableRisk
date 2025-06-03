@@ -49,7 +49,7 @@ export async function analyzePegStability(ticker) {
       {
         params: {
           vs_currency: 'usd',
-          days: 'max', // Get all available data
+          days: '365', // Get one year of data
           interval: 'daily'
         }
       }
@@ -59,6 +59,7 @@ export async function analyzePegStability(ticker) {
       throw new Error('No price data available');
     }
 
+    // Process price data
     const priceData = marketDataResponse.data.prices.map(([timestamp, price]) => ({
       date: new Date(timestamp).toISOString().split('T')[0],
       price: Number(price)
