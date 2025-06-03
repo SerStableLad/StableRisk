@@ -1,15 +1,14 @@
 import axios from 'axios';
 import NodeCache from 'node-cache';
 import { JSDOM } from 'jsdom';
+import { createTimeoutAxios } from '../utils/apiUtils.js';
 
 const cache = new NodeCache({ stdTTL: 86400, checkperiod: 3600 }); // Cache for 24 hours
 
-/**
- * Checks stablecoin transparency by analyzing website content
- * @param {string} websiteUrl - Stablecoin website URL
- * @param {string} ticker - Stablecoin ticker
- * @returns {Promise<Object>} - Transparency score and details
- */
+// Configure axios with timeout
+const webClient = createTimeoutAxios(axios.create());
+
+// Update the checkTransparency function to use the timeout-enabled client
 export async function checkTransparency(websiteUrl, ticker) {
   const cacheKey = `transparency_${ticker.toLowerCase()}`;
   const cachedData = cache.get(cacheKey);
@@ -19,8 +18,8 @@ export async function checkTransparency(websiteUrl, ticker) {
   }
   
   try {
-    // Fetch and analyze website content
-    const response = await axios.get(websiteUrl);
+    // Fetch and analyze website content using timeout-enabled client
+    const response = await webClient.get(websiteUrl);
     const dom = new JSDOM(response.data);
     const content = dom.window.document;
     
