@@ -1,6 +1,7 @@
 import axios from 'axios';
 import NodeCache from 'node-cache';
 import dotenv from 'dotenv';
+import { createTimeoutAxios } from '../utils/apiUtils.js';
 
 dotenv.config();
 
@@ -8,13 +9,13 @@ const cache = new NodeCache({ stdTTL: 86400, checkperiod: 3600 }); // Cache for 
 const COINGECKO_API = 'https://api.coingecko.com/api/v3';
 const API_KEY = process.env.COINGECKO_API_KEY;
 
-// Configure axios with API key
-const coinGeckoClient = axios.create({
+// Configure axios with API key and timeout
+const coinGeckoClient = createTimeoutAxios(axios.create({
   baseURL: COINGECKO_API,
   headers: {
     'x-cg-pro-api-key': API_KEY
   }
-});
+}));
 
 /**
  * Analyzes stablecoin peg stability using historical price data
@@ -42,14 +43,25 @@ export async function analyzePegStability(ticker) {
       throw new Error(`Stablecoin ${ticker} not found`);
     }
     
-    // Get historical market data since launch using 'max' parameter
+    // Get historical market data using /market_chart endpoint
     const marketDataResponse = await coinGeckoClient.get(
-      `/coins/${coin.id}/market_chart?vs_currency=usd&days=max&interval=daily`
+      `/coins/${coin.id}/market_chart`,
+      {
+        params: {
+          vs_currency: 'usd',
+          days: 'max', // Get all available data
+          interval: 'daily'
+        }
+      }
     );
     
-    const priceData = marketDataResponse.data.prices.map(price => ({
-      date: new Date(price[0]).toISOString().split('T')[0],
-      price: price[1]
+    if (!marketDataResponse.data?.prices?.length) {
+      throw new Error('No price data available');
+    }
+
+    const priceData = marketDataResponse.data.prices.map(([timestamp, price]) => ({
+      date: new Date(timestamp).toISOString().split('T')[0],
+      price: Number(price)
     }));
     
     // Analyze peg stability and detect depeg events
