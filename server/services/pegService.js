@@ -21,7 +21,7 @@ const coinGeckoClient = axios.create({
  * @param {string} ticker - The stablecoin ticker
  * @returns {Promise<Array>} - List of peg events
  */
-export async function analyzePegStability(ticker) {
+export async function analyzePegStability(ticker: string) {
   const cacheKey = `peg_stability_${ticker.toLowerCase()}`;
   const cachedData = cache.get(cacheKey);
   
@@ -42,18 +42,9 @@ export async function analyzePegStability(ticker) {
       throw new Error(`Stablecoin ${ticker} not found`);
     }
     
-    // Get coin info first to get the launch date
-    const coinInfoResponse = await coinGeckoClient.get(`/coins/${coin.id}`);
-    const launchDate = coinInfoResponse.data.genesis_date;
-    
-    // Calculate days since launch or default to 365 if no launch date
-    const daysSinceLaunch = launchDate ? 
-      Math.ceil((new Date() - new Date(launchDate)) / (1000 * 60 * 60 * 24)) :
-      365;
-    
-    // Get historical market data since launch
+    // Get historical market data since launch using 'max' parameter
     const marketDataResponse = await coinGeckoClient.get(
-      `/coins/${coin.id}/market_chart?vs_currency=usd&days=${daysSinceLaunch}&interval=daily`
+      `/coins/${coin.id}/market_chart?vs_currency=usd&days=max&interval=daily`
     );
     
     const priceData = marketDataResponse.data.prices.map(price => ({
