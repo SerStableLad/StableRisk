@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Download, Share2, Github } from 'lucide-react';
+import { Download, Share2, Github, ExternalLink, Clock, Shield, RefreshCw } from 'lucide-react';
 import RiskMeter from './RiskMeter';
 import RiskFactorCard from './RiskFactorCard';
 import PegStabilityChart from './PegStabilityChart';
@@ -19,7 +19,8 @@ const RiskReport: React.FC<RiskReportProps> = ({ report }) => {
     factors, 
     pegEvents, 
     auditHistory, 
-    liquidityData 
+    liquidityData,
+    transparencyInfo 
   } = report;
 
   const handleExport = () => {
@@ -153,17 +154,11 @@ const RiskReport: React.FC<RiskReportProps> = ({ report }) => {
         </div>
       </motion.div>
 
-      <motion.h3 
-        variants={item} 
-        className="text-xl font-bold text-gray-900 mb-4"
-      >
+      <motion.h3 variants={item} className="text-xl font-bold text-gray-900 mb-4">
         Risk Factor Analysis
       </motion.h3>
       
-      <motion.div 
-        variants={item}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8"
-      >
+      <motion.div variants={item} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         {Object.entries(factors).map(([key, factor]) => (
           <RiskFactorCard 
             key={key} 
@@ -175,10 +170,97 @@ const RiskReport: React.FC<RiskReportProps> = ({ report }) => {
         ))}
       </motion.div>
 
-      <motion.h3 
-        variants={item} 
-        className="text-xl font-bold text-gray-900 mb-4"
-      >
+      <motion.h3 variants={item} className="text-xl font-bold text-gray-900 mb-4">
+        Transparency & Proof of Reserves
+      </motion.h3>
+
+      <motion.div variants={item} className="bg-white rounded-lg shadow-md p-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div>
+            <h4 className="text-lg font-semibold mb-4">Proof of Reserves</h4>
+            <div className="space-y-4">
+              <div className="flex items-start">
+                <Shield className="h-5 w-5 text-blue-600 mt-1 mr-3" />
+                <div>
+                  <p className="font-medium">Provider</p>
+                  <p className="text-gray-600">
+                    {transparencyInfo?.porProvider || 'No PoR provider found'}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-start">
+                <RefreshCw className="h-5 w-5 text-blue-600 mt-1 mr-3" />
+                <div>
+                  <p className="font-medium">Update Frequency</p>
+                  <p className="text-gray-600">
+                    {transparencyInfo?.updateFrequency || 'Not specified'}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-start">
+                <Clock className="h-5 w-5 text-blue-600 mt-1 mr-3" />
+                <div>
+                  <p className="font-medium">Last Updated</p>
+                  <p className="text-gray-600">
+                    {transparencyInfo?.lastUpdate ? 
+                      new Date(transparencyInfo.lastUpdate).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      }) : 
+                      'Not available'
+                    }
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {transparencyInfo?.porUrl && (
+              <a
+                href={transparencyInfo.porUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center mt-4 text-blue-600 hover:text-blue-800"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                View Latest Proof of Reserves
+              </a>
+            )}
+          </div>
+
+          <div>
+            <h4 className="text-lg font-semibold mb-4">Reserve Composition</h4>
+            {transparencyInfo?.reserves ? (
+              <div className="space-y-3">
+                {transparencyInfo.reserves.map((reserve, index) => (
+                  <div key={index} className="flex justify-between items-center">
+                    <span className="text-gray-700">{reserve.asset}</span>
+                    <span className="font-medium">{reserve.percentage}%</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-600">Reserve composition data not available</p>
+            )}
+
+            {transparencyInfo?.transparencyUrl && (
+              <a
+                href={transparencyInfo.transparencyUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center mt-4 text-blue-600 hover:text-blue-800"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                View Transparency Report
+              </a>
+            )}
+          </div>
+        </div>
+      </motion.div>
+
+      <motion.h3 variants={item} className="text-xl font-bold text-gray-900 mb-4">
         Peg Stability
       </motion.h3>
       

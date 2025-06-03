@@ -53,6 +53,20 @@ export interface LiquidityData {
   amount: number;
 }
 
+export interface Reserve {
+  asset: string;
+  percentage: number;
+}
+
+export interface TransparencyInfo {
+  porProvider?: string;
+  porUrl?: string;
+  updateFrequency?: string;
+  lastUpdate?: string;
+  transparencyUrl?: string;
+  reserves?: Reserve[];
+}
+
 export interface RiskReport {
   coinInfo: CoinInfo;
   totalScore: number;
@@ -68,4 +82,5 @@ export interface RiskReport {
   pegEvents: PegEvent[];
   auditHistory: Audit[];
   liquidityData: LiquidityData[];
+  transparencyInfo?: TransparencyInfo;
 }
