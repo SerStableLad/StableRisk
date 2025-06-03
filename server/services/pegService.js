@@ -21,7 +21,7 @@ const coinGeckoClient = axios.create({
  * @param {string} ticker - The stablecoin ticker
  * @returns {Promise<Array>} - List of peg events
  */
-export async function analyzePegStability(ticker: string) {
+export async function analyzePegStability(ticker) {
   const cacheKey = `peg_stability_${ticker.toLowerCase()}`;
   const cachedData = cache.get(cacheKey);
   
