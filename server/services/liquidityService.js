@@ -1,8 +1,14 @@
 import axios from 'axios';
 import NodeCache from 'node-cache';
+import { createTimeoutAxios } from '../utils/apiUtils.js';
 
 const cache = new NodeCache({ stdTTL: 3600, checkperiod: 600 }); // Cache for 1 hour
 const DEFILLAMA_API = 'https://api.llama.fi';
+
+// Configure axios with timeout
+const defiLlamaClient = createTimeoutAxios(axios.create({
+  baseURL: DEFILLAMA_API
+}));
 
 /**
  * Gets liquidity distribution data for a stablecoin
@@ -19,7 +25,7 @@ export async function getLiquidityData(ticker) {
   
   try {
     // Get stablecoin data from DeFiLlama
-    const response = await axios.get(`${DEFILLAMA_API}/stablecoins`);
+    const response = await defiLlamaClient.get(`/stablecoins`);
     const stablecoin = response.data.stablecoins.find(
       s => s.symbol.toLowerCase() === ticker.toLowerCase()
     );
@@ -29,8 +35,8 @@ export async function getLiquidityData(ticker) {
     }
     
     // Get chain distribution
-    const chainData = await axios.get(
-      `${DEFILLAMA_API}/stablecoin/${stablecoin.id}/chains`
+    const chainData = await defiLlamaClient.get(
+      `/stablecoin/${stablecoin.id}/chains`
     );
     
     const liquidityData = chainData.data.chains.map(chain => ({

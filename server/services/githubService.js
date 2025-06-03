@@ -1,6 +1,7 @@
 import axios from 'axios';
 import NodeCache from 'node-cache';
 import dotenv from 'dotenv';
+import { createTimeoutAxios } from '../utils/apiUtils.js';
 
 dotenv.config();
 
@@ -8,14 +9,14 @@ const cache = new NodeCache({ stdTTL: 86400, checkperiod: 3600 }); // Cache for 
 const GITHUB_API = 'https://api.github.com';
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 
-// Configure axios with GitHub token
-const githubClient = axios.create({
+// Configure axios with GitHub token and timeout
+const githubClient = createTimeoutAxios(axios.create({
   baseURL: GITHUB_API,
   headers: {
     'Authorization': `token ${GITHUB_TOKEN}`,
     'Accept': 'application/vnd.github.v3+json'
   }
-});
+}));
 
 /**
  * Analyzes a GitHub repository to extract relevant information
