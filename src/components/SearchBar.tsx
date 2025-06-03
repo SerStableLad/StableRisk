@@ -39,7 +39,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearch }) => {
             className={`block w-full pl-10 pr-12 py-3 border ${
               error ? 'border-red-300' : 'border-gray-300'
             } rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm text-lg`}
-            placeholder="Enter stablecoin ticker (e.g., USDT, DAI)"
+            placeholder="Enter stablecoin ticker (e.g., USDT, USDS)"
             value={value}
             onChange={(e) => setValue(e.target.value)}
           />
@@ -62,7 +62,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearch }) => {
           </motion.p>
         )}
         <p className="mt-2 text-sm text-gray-500">
-          Popular stablecoins: USDT, USDC, DAI, BUSD, TUSD
+          Popular stablecoins: USDT, USDC, USDS, BUSD, TUSD
         </p>
       </form>
     </motion.div>
