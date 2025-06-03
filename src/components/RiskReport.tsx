@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Download, Share2 } from 'lucide-react';
+import { Download, Share2, Globe, Github } from 'lucide-react';
 import RiskMeter from './RiskMeter';
 import RiskFactorCard from './RiskFactorCard';
 import PegStabilityChart from './PegStabilityChart';
@@ -99,7 +99,7 @@ const RiskReport: React.FC<RiskReportProps> = ({ report }) => {
               <p className="text-gray-600 mb-4">
                 {report.summary}
               </p>
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-gray-500">Market Cap:</span>{' '}
                   <span className="font-medium">${coinInfo.marketCap.toLocaleString()}</span>
@@ -115,6 +115,34 @@ const RiskReport: React.FC<RiskReportProps> = ({ report }) => {
                 <div>
                   <span className="text-gray-500">Blockchain:</span>{' '}
                   <span className="font-medium">{coinInfo.blockchain}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Price Feed:</span>{' '}
+                  <span className="font-medium">{coinInfo.priceFeed || 'Not available'}</span>
+                </div>
+                <div className="flex items-center space-x-4">
+                  {coinInfo.website && (
+                    <a
+                      href={coinInfo.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center text-blue-600 hover:text-blue-800"
+                    >
+                      <Globe className="h-4 w-4 mr-1" />
+                      Website
+                    </a>
+                  )}
+                  {coinInfo.github && (
+                    <a
+                      href={coinInfo.github}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center text-blue-600 hover:text-blue-800"
+                    >
+                      <Github className="h-4 w-4 mr-1" />
+                      GitHub
+                    </a>
+                  )}
                 </div>
               </div>
             </div>
