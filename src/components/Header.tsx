@@ -9,7 +9,7 @@ const Header = () => {
           <div className="flex items-center">
             <Shield className="h-8 w-8 text-blue-600" />
             <h1 className="ml-2 text-xl font-bold text-gray-900">
-              Stablecoin Risk Rater
+              StableRisk
             </h1>
             <a 
               href="https://x.com/SerStableLad" 
