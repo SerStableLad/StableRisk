@@ -4,13 +4,128 @@ import * as cheerio from 'cheerio';
 
 const cache = new NodeCache({ stdTTL: 3600, checkperiod: 600 });
 
-async function findGithubFromWebsite(websiteUrl) {
+// Common documentation platforms and their URL patterns
+const DOC_PLATFORMS = {
+  gitbook: ['/gitbook.io/', '.gitbook.io'],
+  readthedocs: ['.readthedocs.io', '/readthedocs.org/'],
+  github: ['/github.io/', '/docs/', '/documentation/'],
+  notion: ['.notion.site'],
+  custom: ['docs.', 'documentation.', 'whitepaper.', '/docs', '/documentation', '/whitepaper']
+};
+
+async function findDocumentationUrls(websiteUrl) {
   try {
-    // Normalize website URL
     const normalizedUrl = websiteUrl.startsWith('http') ? websiteUrl : `https://${websiteUrl}`;
     
     const response = await axios.get(normalizedUrl, {
-      timeout: 10000, // Increased timeout
+      timeout: 10000,
+      maxRedirects: 5,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br'
+      }
+    });
+    
+    const $ = cheerio.load(response.data);
+    const docUrls = new Set();
+    
+    // Look for documentation links
+    $('a').each((_, el) => {
+      const href = $(el).attr('href');
+      const text = $(el).text().toLowerCase();
+      
+      if (!href) return;
+      
+      // Convert relative URLs to absolute
+      const fullUrl = href.startsWith('http') ? href : new URL(href, normalizedUrl).href;
+      
+      // Check against documentation platform patterns
+      const isDocLink = Object.values(DOC_PLATFORMS).flat().some(pattern => 
+        fullUrl.includes(pattern) || text.includes('documentation') || text.includes('docs')
+      );
+      
+      if (isDocLink) {
+        docUrls.add(fullUrl);
+      }
+    });
+    
+    return Array.from(docUrls);
+  } catch (error) {
+    console.error('Error finding documentation URLs:', error.message);
+    return [];
+  }
+}
+
+async function findAuditReports(docUrls) {
+  const auditKeywords = ['audit', 'security', 'assessment', 'review'];
+  const auditFirms = ['certik', 'consensys', 'trail of bits', 'quantstamp', 'hacken', 'omniscia', 'peckshield'];
+  const auditReports = [];
+  
+  for (const url of docUrls) {
+    try {
+      const response = await axios.get(url, {
+        timeout: 10000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      });
+      
+      const $ = cheerio.load(response.data);
+      
+      // Look for audit-related links and content
+      $('a').each((_, el) => {
+        const href = $(el).attr('href');
+        const text = $(el).text().toLowerCase();
+        
+        if (!href) return;
+        
+        const hasAuditKeyword = auditKeywords.some(keyword => text.includes(keyword));
+        const hasAuditFirm = auditFirms.some(firm => text.includes(firm));
+        
+        if (hasAuditKeyword || hasAuditFirm) {
+          const fullUrl = href.startsWith('http') ? href : new URL(href, url).href;
+          
+          // Check if it's a PDF or document link
+          if (fullUrl.match(/\.(pdf|doc|docx)$/i) || text.includes('report')) {
+            auditReports.push({
+              url: fullUrl,
+              title: text,
+              source: url
+            });
+          }
+        }
+      });
+      
+      // Look for embedded audit information
+      $('div, section, article').each((_, el) => {
+        const text = $(el).text().toLowerCase();
+        
+        if (auditKeywords.some(keyword => text.includes(keyword)) &&
+            auditFirms.some(firm => text.includes(firm))) {
+          const auditInfo = {
+            content: text.slice(0, 500), // First 500 characters
+            source: url
+          };
+          auditReports.push(auditInfo);
+        }
+      });
+      
+    } catch (error) {
+      console.warn(`Error fetching audit info from ${url}:`, error.message);
+    }
+  }
+  
+  return auditReports;
+}
+
+async function findGithubFromWebsite(websiteUrl) {
+  try {
+    const normalizedUrl = websiteUrl.startsWith('http') ? websiteUrl : `https://${websiteUrl}`;
+    
+    const response = await axios.get(normalizedUrl, {
+      timeout: 10000,
       maxRedirects: 5,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -18,12 +133,10 @@ async function findGithubFromWebsite(websiteUrl) {
         'Accept-Language': 'en-US,en;q=0.5',
         'Accept-Encoding': 'gzip, deflate, br'
       },
-      validateStatus: status => status < 400 // Accept redirects
+      validateStatus: status => status < 400
     });
     
     const $ = cheerio.load(response.data);
-    
-    // Look for GitHub links in various ways
     const githubLinks = new Set();
     
     // Direct GitHub links with improved selector
@@ -62,20 +175,15 @@ async function findGithubFromWebsite(websiteUrl) {
     const validGithubLinks = Array.from(githubLinks)
       .map(url => {
         try {
-          // Handle relative URLs
           const fullUrl = url.startsWith('http') ? url : new URL(url, normalizedUrl).href;
           
-          // Normalize URL
           const cleanUrl = fullUrl.trim()
-            .replace(/\/$/, '') // Remove trailing slash
-            .replace(/\/+$/, '') // Remove multiple trailing slashes
-            .replace('http:', 'https:') // Use HTTPS
-            .split('#')[0] // Remove hash
-            .split('?')[0]; // Remove query params
+            .replace(/\/$/, '')
+            .replace(/\/+$/, '')
+            .replace('http:', 'https:')
+            .split('#')[0]
+            .split('?')[0];
           
-          // Ensure it's a valid GitHub repository URL
-          // Match organization/user repos: github.com/org/repo
-          // Match organization repos: github.com/orgs/org/repositories
           if (cleanUrl.match(/github\.com\/[^/]+\/[^/]+$/) || 
               cleanUrl.match(/github\.com\/orgs\/[^/]+\/repositories$/)) {
             return cleanUrl;
@@ -98,7 +206,6 @@ async function findGithubFromWebsite(websiteUrl) {
         });
         const $org = cheerio.load(orgResponse.data);
         
-        // Look for pinned repositories
         $org('a[href*="/repositories"]').each((_, el) => {
           const href = $org(el).attr('href');
           if (href && href.match(/\/[^/]+\/[^/]+$/)) {
@@ -126,12 +233,10 @@ export async function getLiquidityData(ticker) {
   }
   
   try {
-    // Get data from CoinGecko
     const response = await axios.get(
       `https://api.coingecko.com/api/v3/coins/${ticker.toLowerCase()}/tickers`
     );
     
-    // Calculate liquidity by summing up volumes from major exchanges
     const liquidityData = response.data.tickers
       .filter(t => t.target === 'USD' && t.trust_score === 'green')
       .reduce((acc, t) => {
@@ -150,7 +255,7 @@ export async function getLiquidityData(ticker) {
         return acc;
       }, [])
       .sort((a, b) => b.amount - a.amount)
-      .slice(0, 10); // Keep top 10 exchanges
+      .slice(0, 10);
 
     return {
       liquidityData,
@@ -175,10 +280,29 @@ export async function getGithubUrl(websiteUrl, ticker) {
   
   let githubUrl = '';
   
-  // Try website first if available
   if (websiteUrl) {
     try {
+      // First find documentation URLs
+      const docUrls = await findDocumentationUrls(websiteUrl);
+      
+      // Look for audit reports in documentation
+      const auditReports = await findAuditReports(docUrls);
+      
+      // Cache audit reports for later use
+      if (auditReports.length > 0) {
+        cache.set(`audit_reports_${ticker.toLowerCase()}`, auditReports);
+      }
+      
+      // Try to find GitHub URL from main website
       githubUrl = await findGithubFromWebsite(websiteUrl);
+      
+      // If not found, try documentation pages
+      if (!githubUrl) {
+        for (const docUrl of docUrls) {
+          githubUrl = await findGithubFromWebsite(docUrl);
+          if (githubUrl) break;
+        }
+      }
       
       if (githubUrl) {
         cache.set(cacheKey, githubUrl);
@@ -189,7 +313,6 @@ export async function getGithubUrl(websiteUrl, ticker) {
     }
   }
   
-  // Try CoinGecko API as fallback
   try {
     const response = await axios.get(
       `https://api.coingecko.com/api/v3/coins/${ticker.toLowerCase()}`
