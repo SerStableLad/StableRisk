@@ -1,6 +1,7 @@
 import NodeCache from 'node-cache';
 import axios from 'axios';
 import dotenv from 'dotenv';
+import { getCurrentDate, getEightMonthsAgo } from '../utils/dateUtils.js';
 
 dotenv.config();
 
@@ -16,9 +17,6 @@ const githubClient = axios.create({
     'Accept': 'application/vnd.github.v3+json'
   }
 });
-
-// Current date constant
-const CURRENT_DATE = new Date('2025-06-03');
 
 /**
  * Gets audit history for a stablecoin
@@ -67,8 +65,7 @@ export async function getAuditHistory(ticker, name, repoUrl) {
     });
 
     // Get file contents and metadata for each audit file
-    const eightMonthsAgo = new Date(CURRENT_DATE);
-    eightMonthsAgo.setMonth(eightMonthsAgo.getMonth() - 8);
+    const eightMonthsAgo = getEightMonthsAgo();
 
     const audits = [];
     for (const file of auditFiles) {
