@@ -1,10 +1,10 @@
 import axios from 'axios';
-import { RiskReport } from '../types/RiskReport';
+import { RiskReport, DataDiscrepancy } from '../types/RiskReport';
 
 const API_BASE_URL = ''; // Empty string to use relative URLs with the proxy
 
 /**
- * Fetches stablecoin risk report data
+ * Fetches stablecoin risk report data with cross-validation
  */
 export async function fetchStablecoinRiskReport(ticker: string): Promise<RiskReport> {
   if (!ticker) {
@@ -12,7 +12,9 @@ export async function fetchStablecoinRiskReport(ticker: string): Promise<RiskRep
   }
   
   try {
-    const response = await axios.get<RiskReport>(`${API_BASE_URL}/api/stablecoins/${ticker}`);
+    const response = await axios.get<RiskReport & { discrepancies: DataDiscrepancy[] }>(
+      `${API_BASE_URL}/api/stablecoins/${ticker}?validate=true`
+    );
     return response.data;
   } catch (error) {
     if (axios.isAxiosError(error)) {

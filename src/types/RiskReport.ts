@@ -11,6 +11,15 @@ export interface CoinInfo {
   launchDate: string;
   collateralType: string;
   blockchain: string;
+  priceFeed: string;
+}
+
+export interface DataDiscrepancy {
+  field: string;
+  coingeckoValue: string | number;
+  defiLlamaValue: string | number;
+  severity: 'low' | 'medium' | 'high';
+  description: string;
 }
 
 export interface RiskFactor {
@@ -48,6 +57,7 @@ export interface RiskReport {
   coinInfo: CoinInfo;
   totalScore: number;
   summary: string;
+  discrepancies: DataDiscrepancy[];
   factors: {
     auditHistory: RiskFactor;
     pegStability: RiskFactor;

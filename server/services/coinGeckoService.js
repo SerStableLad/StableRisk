@@ -14,7 +14,6 @@ const coinGeckoClient = axios.create({
   headers: {
     'x-cg-pro-api-key': API_KEY
   },
-  // Add retry configuration
   timeout: 10000,
   maxRetries: 3,
   retryDelay: 1000
@@ -23,7 +22,6 @@ const coinGeckoClient = axios.create({
 // Add response interceptor for rate limiting
 coinGeckoClient.interceptors.response.use(null, async error => {
   if (error.response?.status === 429) {
-    // Get retry-after header or default to 60 seconds
     const retryAfter = parseInt(error.response.headers['retry-after']) || 60;
     await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
     return coinGeckoClient.request(error.config);
@@ -33,8 +31,6 @@ coinGeckoClient.interceptors.response.use(null, async error => {
 
 /**
  * Fetches basic coin information from CoinGecko API
- * @param {string} ticker - The stablecoin ticker
- * @returns {Promise<Object>} - Coin information
  */
 export async function fetchCoinInfo(ticker) {
   const cacheKey = `coin_info_${ticker.toLowerCase()}`;
@@ -59,10 +55,15 @@ export async function fetchCoinInfo(ticker) {
     
     // Get detailed coin info
     const coinInfoResponse = await coinGeckoClient.get(
-      `/coins/${coin.id}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=true`
+      `/coins/${coin.id}?localization=false&tickers=true&market_data=true&community_data=false&developer_data=true&sparkline=false`
     );
     
     const data = coinInfoResponse.data;
+    
+    // Extract price feed information
+    const priceFeed = data.tickers
+      .filter(t => t.target === 'USD' && t.trust_score === 'green')
+      .sort((a, b) => b.volume - a.volume)[0]?.market.identifier || '';
     
     // Extract the relevant information
     const coinInfo = {
@@ -74,9 +75,10 @@ export async function fetchCoinInfo(ticker) {
       website: data.links?.homepage?.[0] || '',
       github: data.links?.repos_url?.github?.[0] || '',
       marketCap: data.market_data?.market_cap?.usd || 0,
-      launchDate: 'Unknown', // CoinGecko doesn't provide this directly
+      launchDate: data.genesis_date || 'Unknown',
       collateralType: determineCollateralType(data),
-      blockchain: determineBlockchain(data)
+      blockchain: determineBlockchain(data),
+      priceFeed
     };
     
     cache.set(cacheKey, coinInfo);
@@ -90,38 +92,21 @@ export async function fetchCoinInfo(ticker) {
   }
 }
 
-/**
- * Determine collateral type based on coin description and tags
- */
 function determineCollateralType(data) {
   const description = data.description?.en?.toLowerCase() || '';
   const tags = data.categories || [];
   
-  if (
-    description.includes('fiat') || 
-    description.includes('usd backed') || 
-    description.includes('dollar backed')
-  ) {
+  if (description.includes('fiat') || description.includes('usd backed')) {
     return 'Fiat-backed';
-  } else if (
-    description.includes('algorithm') || 
-    tags.includes('algorithmic-stablecoin')
-  ) {
+  } else if (description.includes('algorithm') || tags.includes('algorithmic-stablecoin')) {
     return 'Algorithmic';
-  } else if (
-    description.includes('crypto') || 
-    description.includes('collateral') || 
-    tags.includes('defi')
-  ) {
+  } else if (description.includes('crypto') || description.includes('collateral')) {
     return 'Crypto-backed';
   }
   
   return 'Unknown';
 }
 
-/**
- * Determine blockchain based on coin platforms
- */
 function determineBlockchain(data) {
   if (!data.platforms || Object.keys(data.platforms).length === 0) {
     return 'Unknown';
@@ -133,7 +118,6 @@ function determineBlockchain(data) {
   
   const platform = Object.keys(data.platforms)[0];
   
-  // Map platform IDs to readable names
   const platformMapping = {
     'ethereum': 'Ethereum',
     'binance-smart-chain': 'BSC',

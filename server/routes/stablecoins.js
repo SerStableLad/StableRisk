@@ -1,47 +1,69 @@
 import express from 'express';
 import NodeCache from 'node-cache';
 import { fetchCoinInfo } from '../services/coinGeckoService.js';
+import { getLiquidityData } from '../services/liquidityService.js';
 import { analyzeGithubRepo } from '../services/githubService.js';
 import { getAuditHistory } from '../services/auditService.js';
 import { analyzePegStability } from '../services/pegService.js';
 import { checkTransparency } from '../services/transparencyService.js';
-import { getLiquidityData } from '../services/liquidityService.js';
 import { calculateRiskScore } from '../services/scoringEngine.js';
 
 const router = express.Router();
-const cache = new NodeCache({ stdTTL: 3600, checkperiod: 600 }); // Cache for 1 hour
+const cache = new NodeCache({ stdTTL: 3600, checkperiod: 600 });
 
-// Get risk report for a specific stablecoin
 router.get('/:ticker', async (req, res, next) => {
   try {
     const { ticker } = req.params;
+    const validate = req.query.validate === 'true';
     const cacheKey = `risk_report_${ticker.toLowerCase()}`;
     
-    // Check cache first
     const cachedData = cache.get(cacheKey);
     if (cachedData) {
       return res.json(cachedData);
     }
     
-    // Fetch base coin info
-    const coinInfo = await fetchCoinInfo(ticker);
+    // Fetch data from both CoinGecko and DeFiLlama
+    const [coinInfo, liquidityData] = await Promise.all([
+      fetchCoinInfo(ticker),
+      getLiquidityData(ticker)
+    ]);
+    
     if (!coinInfo) {
       return res.status(404).json({ message: `Stablecoin ${ticker} not found` });
     }
     
-    // Parallel fetch all required data
-    const [
-      githubData,
-      auditHistory,
-      pegEvents,
-      transparencyScore,
-      liquidityData
-    ] = await Promise.all([
-      analyzeGithubRepo(coinInfo.github),
-      getAuditHistory(ticker, coinInfo.name),
+    // Cross-validate data between sources
+    const discrepancies = [];
+    if (validate) {
+      const cgMarketCap = coinInfo.marketCap;
+      const dlMarketCap = liquidityData.reduce((sum, item) => sum + item.amount, 0);
+      
+      if (Math.abs(cgMarketCap - dlMarketCap) / cgMarketCap > 0.1) {
+        discrepancies.push({
+          field: 'marketCap',
+          coingeckoValue: cgMarketCap,
+          defiLlamaValue: dlMarketCap,
+          severity: 'high',
+          description: 'Significant market cap discrepancy between data sources'
+        });
+      }
+    }
+    
+    // If GitHub repo is available, analyze it
+    let githubData = null;
+    let auditHistory = [];
+    
+    if (coinInfo.github) {
+      [githubData, auditHistory] = await Promise.all([
+        analyzeGithubRepo(coinInfo.github),
+        getAuditHistory(ticker, coinInfo.name)
+      ]);
+    }
+    
+    // Fetch remaining data
+    const [pegEvents, transparencyScore] = await Promise.all([
       analyzePegStability(ticker),
-      checkTransparency(coinInfo.website, ticker),
-      getLiquidityData(ticker)
+      checkTransparency(coinInfo.website, ticker)
     ]);
     
     // Calculate risk score
@@ -54,21 +76,14 @@ router.get('/:ticker', async (req, res, next) => {
       liquidityData
     });
     
-    // Cache the result
-    cache.set(cacheKey, riskReport);
+    // Add discrepancies to the report
+    const fullReport = {
+      ...riskReport,
+      discrepancies
+    };
     
-    res.json(riskReport);
-  } catch (error) {
-    next(error);
-  }
-});
-
-// Search for stablecoins by keyword
-router.get('/search/:keyword', async (req, res, next) => {
-  try {
-    const { keyword } = req.params;
-    const results = await searchStablecoins(keyword);
-    res.json(results);
+    cache.set(cacheKey, fullReport);
+    res.json(fullReport);
   } catch (error) {
     next(error);
   }
