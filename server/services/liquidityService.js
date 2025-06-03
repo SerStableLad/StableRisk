@@ -3,7 +3,6 @@ import NodeCache from 'node-cache';
 import cheerio from 'cheerio';
 
 const cache = new NodeCache({ stdTTL: 3600, checkperiod: 600 });
-const DEFILLAMA_API = 'https://stablecoins.llama.fi';
 
 async function findGithubFromWebsite(websiteUrl) {
   try {
@@ -32,43 +31,35 @@ export async function getLiquidityData(ticker) {
   }
   
   try {
-    // Get stablecoin data from DeFiLlama's stablecoin API
-    const response = await axios.get(`${DEFILLAMA_API}/stablecoins`);
-    const stablecoin = response.data.peggedAssets.find(
-      s => s.symbol.toLowerCase() === ticker.toLowerCase()
+    // Get data from CoinGecko instead of DeFiLlama
+    const response = await axios.get(
+      `https://api.coingecko.com/api/v3/coins/${ticker.toLowerCase()}/tickers`
     );
     
-    if (!stablecoin) {
-      throw new Error(`Stablecoin ${ticker} not found`);
-    }
-    
-    // Get chain distribution from peggedAssetChains endpoint
-    const chainData = await axios.get(
-      `${DEFILLAMA_API}/stablecoin/${stablecoin.id}`
-    );
-    
-    const liquidityData = Object.entries(chainData.data.chainCirculating)
-      .filter(([_, amount]) => amount > 0)
-      .map(([chain, amount]) => ({
-        chain,
-        amount
-      }));
-
-    // Get protocol info for GitHub link
-    const protocolInfo = await axios.get(
-      `https://api.llama.fi/protocol/${stablecoin.id}`
-    ).catch(() => ({ data: {} }));
-
-    const githubUrl = protocolInfo.data.github || '';
-    
-    cache.set(cacheKey, {
-      liquidityData,
-      githubUrl
-    });
+    // Calculate liquidity by summing up volumes from major exchanges
+    const liquidityData = response.data.tickers
+      .filter(t => t.target === 'USD' && t.trust_score === 'green')
+      .reduce((acc, t) => {
+        const exchange = t.market.identifier;
+        const existingExchange = acc.find(item => item.chain === exchange);
+        
+        if (existingExchange) {
+          existingExchange.amount += t.volume;
+        } else {
+          acc.push({
+            chain: exchange,
+            amount: t.volume
+          });
+        }
+        
+        return acc;
+      }, [])
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 10); // Keep top 10 exchanges
 
     return {
       liquidityData,
-      githubUrl
+      githubUrl: ''
     };
   } catch (error) {
     console.error('Error fetching liquidity data:', error.message);
@@ -80,18 +71,25 @@ export async function getLiquidityData(ticker) {
 }
 
 export async function getGithubUrl(websiteUrl, ticker) {
-  // Try DeFiLlama first
-  const { githubUrl } = await getLiquidityData(ticker);
-  if (githubUrl) {
-    return githubUrl;
-  }
-
-  // If no GitHub from DeFiLlama, try website
+  // Try website first
   if (websiteUrl) {
     const websiteGithub = await findGithubFromWebsite(websiteUrl);
     if (websiteGithub) {
       return websiteGithub;
     }
+  }
+
+  // Try CoinGecko API
+  try {
+    const response = await axios.get(
+      `https://api.coingecko.com/api/v3/coins/${ticker.toLowerCase()}`
+    );
+    
+    if (response.data.links?.repos_url?.github?.[0]) {
+      return response.data.links.repos_url.github[0];
+    }
+  } catch (error) {
+    console.error('Error fetching GitHub URL from CoinGecko:', error.message);
   }
 
   return '';

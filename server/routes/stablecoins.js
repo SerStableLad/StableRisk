@@ -23,7 +23,7 @@ router.get('/:ticker', async (req, res, next) => {
     }
     
     // Fetch initial data with better error handling
-    let coinInfo, liquidityInfo;
+    let coinInfo;
     
     try {
       coinInfo = await fetchCoinInfo(ticker);
@@ -36,20 +36,6 @@ router.get('/:ticker', async (req, res, next) => {
       }
       throw error;
     }
-    
-    try {
-      liquidityInfo = await getLiquidityData(ticker);
-    } catch (error) {
-      if (error.message.includes('not found')) {
-        return res.status(404).json({
-          message: `Stablecoin ${ticker} not found in DeFiLlama database`,
-          details: 'The stablecoin may be too new or not tracked by DeFiLlama'
-        });
-      }
-      throw error;
-    }
-    
-    const { liquidityData } = liquidityInfo;
     
     if (!coinInfo) {
       return res.status(404).json({
@@ -67,21 +53,14 @@ router.get('/:ticker', async (req, res, next) => {
       // Non-critical error, continue without GitHub data
     }
     
-    // Cross-validate data between sources
-    const discrepancies = [];
-    if (validate) {
-      const cgMarketCap = coinInfo.marketCap;
-      const dlMarketCap = liquidityData.reduce((sum, item) => sum + item.amount, 0);
-      
-      if (Math.abs(cgMarketCap - dlMarketCap) / cgMarketCap > 0.1) {
-        discrepancies.push({
-          field: 'marketCap',
-          coingeckoValue: cgMarketCap,
-          defiLlamaValue: dlMarketCap,
-          severity: 'high',
-          description: 'Significant market cap discrepancy between data sources'
-        });
-      }
+    // Get liquidity data
+    let liquidityData = [];
+    try {
+      const liquidityInfo = await getLiquidityData(ticker);
+      liquidityData = liquidityInfo.liquidityData;
+    } catch (error) {
+      console.warn(`Failed to fetch liquidity data for ${ticker}:`, error.message);
+      // Non-critical error, continue with empty liquidity data
     }
     
     // If GitHub repo is available, analyze it
@@ -126,10 +105,10 @@ router.get('/:ticker', async (req, res, next) => {
       liquidityData
     });
     
-    // Add discrepancies to the report
+    // Add empty discrepancies array since we're not cross-validating anymore
     const fullReport = {
       ...riskReport,
-      discrepancies
+      discrepancies: []
     };
     
     cache.set(cacheKey, fullReport);
