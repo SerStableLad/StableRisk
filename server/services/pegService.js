@@ -42,9 +42,18 @@ export async function analyzePegStability(ticker) {
       throw new Error(`Stablecoin ${ticker} not found`);
     }
     
-    // Get historical market data for the past year
+    // Get coin info to find launch date
+    const coinInfoResponse = await coinGeckoClient.get(`/coins/${coin.id}`);
+    const launchDate = coinInfoResponse.data.genesis_date;
+    
+    // Calculate days since launch
+    const daysSinceLaunch = launchDate ? 
+      Math.ceil((new Date() - new Date(launchDate)) / (1000 * 60 * 60 * 24)) :
+      365; // Default to 1 year if no launch date
+    
+    // Get historical market data since launch
     const marketDataResponse = await coinGeckoClient.get(
-      `/coins/${coin.id}/market_chart?vs_currency=usd&days=365&interval=daily`
+      `/coins/${coin.id}/market_chart?vs_currency=usd&days=${daysSinceLaunch}&interval=daily`
     );
     
     const priceData = marketDataResponse.data.prices.map(price => ({

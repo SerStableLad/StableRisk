@@ -265,7 +265,7 @@ const RiskReport: React.FC<RiskReportProps> = ({ report }) => {
       </motion.h3>
       
       <motion.div variants={item} className="bg-white rounded-lg shadow-md p-6 mb-8">
-        <PegStabilityChart pegEvents={pegEvents} />
+        <PegStabilityChart pegEvents={pegEvents} launchDate={coinInfo.launchDate} />
       </motion.div>
 
       <motion.div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">

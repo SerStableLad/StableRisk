@@ -26,9 +26,10 @@ ChartJS.register(
 
 interface PegStabilityChartProps {
   pegEvents: PegEvent[];
+  launchDate: string;
 }
 
-const PegStabilityChart: React.FC<PegStabilityChartProps> = ({ pegEvents }) => {
+const PegStabilityChart: React.FC<PegStabilityChartProps> = ({ pegEvents, launchDate }) => {
   const sortedEvents = [...pegEvents].sort((a, b) => 
     new Date(a.date).getTime() - new Date(b.date).getTime()
   );
@@ -36,7 +37,11 @@ const PegStabilityChart: React.FC<PegStabilityChartProps> = ({ pegEvents }) => {
   const data = {
     labels: sortedEvents.map(event => {
       const date = new Date(event.date);
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        year: 'numeric',
+        day: 'numeric' 
+      });
     }),
     datasets: [
       {
@@ -45,10 +50,12 @@ const PegStabilityChart: React.FC<PegStabilityChartProps> = ({ pegEvents }) => {
         borderColor: 'rgb(59, 130, 246)',
         backgroundColor: 'rgba(59, 130, 246, 0.5)',
         tension: 0.2,
+        pointRadius: 3,
+        pointHoverRadius: 6,
       },
       {
         label: 'Ideal Peg',
-        data: sortedEvents.map(() => 1.0), // Assuming 1.0 is the ideal peg value
+        data: sortedEvents.map(() => 1.0),
         borderColor: 'rgba(75, 85, 99, 0.6)',
         borderDash: [5, 5],
         borderWidth: 1,
@@ -60,6 +67,7 @@ const PegStabilityChart: React.FC<PegStabilityChartProps> = ({ pegEvents }) => {
 
   const options: ChartOptions<'line'> = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
       legend: {
         position: 'top',
@@ -89,13 +97,17 @@ const PegStabilityChart: React.FC<PegStabilityChartProps> = ({ pegEvents }) => {
         grid: {
           display: false,
         },
+        ticks: {
+          maxRotation: 45,
+          minRotation: 45,
+        }
       },
       y: {
         min: Math.max(0, Math.min(...pegEvents.map(e => e.price)) - 0.05),
         max: Math.max(...pegEvents.map(e => e.price)) + 0.05,
         ticks: {
           callback: function(value) {
-            return '$' + value;
+            return '$' + value.toFixed(3);
           }
         }
       },
@@ -116,13 +128,17 @@ const PegStabilityChart: React.FC<PegStabilityChartProps> = ({ pegEvents }) => {
     return sum + Math.abs((event.price - 1.0) / 1.0 * 100);
   }, 0) / pegEvents.length;
 
+  const daysListed = Math.ceil(
+    (new Date().getTime() - new Date(launchDate).getTime()) / (1000 * 60 * 60 * 24)
+  );
+
   return (
     <div>
-      <div className="mb-6">
+      <div className="h-[400px] mb-6">
         <Line data={data} options={options} />
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
         <div className="bg-gray-50 p-4 rounded-lg">
           <p className="text-sm text-gray-500 mb-1">Maximum Deviation</p>
           <p className="text-xl font-semibold text-gray-900">
@@ -133,6 +149,12 @@ const PegStabilityChart: React.FC<PegStabilityChartProps> = ({ pegEvents }) => {
           <p className="text-sm text-gray-500 mb-1">Average Deviation</p>
           <p className="text-xl font-semibold text-gray-900">
             {averageDeviation.toFixed(2)}%
+          </p>
+        </div>
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <p className="text-sm text-gray-500 mb-1">Days Since Launch</p>
+          <p className="text-xl font-semibold text-gray-900">
+            {daysListed}
           </p>
         </div>
         <div className="bg-gray-50 p-4 rounded-lg">
