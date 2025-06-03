@@ -11,11 +11,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Load environment variables from server/.env
 const envPath = resolve(__dirname, '.env');
+console.log('Loading .env from:', envPath);
+
 const result = dotenv.config({ path: envPath });
 
 if (result.error) {
   console.error('Error loading .env file:', result.error);
-  process.exit(1);
+  throw result.error;
 }
 
 // Validate required environment variables
@@ -36,8 +38,13 @@ const cache = new NodeCache({ stdTTL: 600, checkperiod: 120 });
 // Create Express app
 const app = express();
 
-// Apply middleware
-app.use(cors());
+// Configure CORS
+app.use(cors({
+  origin: isProduction ? 'https://your-domain.com' : 'http://localhost:5173',
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json());
 
 // Apply rate limiting
