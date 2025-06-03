@@ -7,10 +7,26 @@ import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 import NodeCache from 'node-cache';
 
-// Load environment variables from server/.env
-dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '.env') });
-
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Load environment variables from server/.env
+const envPath = resolve(__dirname, '.env');
+const result = dotenv.config({ path: envPath });
+
+if (result.error) {
+  console.error('Error loading .env file:', result.error);
+  process.exit(1);
+}
+
+// Validate required environment variables
+const requiredEnvVars = ['PORT', 'NODE_ENV', 'RATE_LIMIT_WINDOW_MS', 'RATE_LIMIT_MAX'];
+const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+if (missingEnvVars.length > 0) {
+  console.error('Missing required environment variables:', missingEnvVars.join(', '));
+  process.exit(1);
+}
+
 const isProduction = process.env.NODE_ENV === 'production';
 const PORT = process.env.PORT || 3001;
 
@@ -26,8 +42,8 @@ app.use(express.json());
 
 // Apply rate limiting
 const apiLimiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX) || 100, // limit each IP to 100 requests per windowMs
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
+  max: parseInt(process.env.RATE_LIMIT_MAX) || 100,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -65,7 +81,8 @@ if (!isProduction) {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('Error:', err.message);
+  console.error('Stack:', err.stack);
   res.status(err.status || 500).json({
     message: err.message || 'An unexpected error occurred',
     stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
@@ -76,6 +93,7 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV}`);
+  console.log(`Env file loaded from: ${envPath}`);
 });
 
 export default app;
