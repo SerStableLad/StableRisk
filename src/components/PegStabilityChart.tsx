@@ -30,7 +30,12 @@ interface PegStabilityChartProps {
 }
 
 const PegStabilityChart: React.FC<PegStabilityChartProps> = ({ pegEvents, launchDate }) => {
-  const sortedEvents = [...pegEvents].sort((a, b) => 
+  // Filter out any invalid data points
+  const validEvents = pegEvents.filter(event => 
+    event.price && !isNaN(event.price) && new Date(event.date).getTime() > 0
+  );
+
+  const sortedEvents = [...validEvents].sort((a, b) => 
     new Date(a.date).getTime() - new Date(b.date).getTime()
   );
 
@@ -46,7 +51,7 @@ const PegStabilityChart: React.FC<PegStabilityChartProps> = ({ pegEvents, launch
     datasets: [
       {
         label: 'Price (USD)',
-        data: sortedEvents.map(event => event.price),
+        data: sortedEvents.map(event => Number(event.price.toFixed(4))),
         borderColor: 'rgb(59, 130, 246)',
         backgroundColor: 'rgba(59, 130, 246, 0.5)',
         tension: 0.2,
@@ -103,11 +108,11 @@ const PegStabilityChart: React.FC<PegStabilityChartProps> = ({ pegEvents, launch
         }
       },
       y: {
-        min: Math.max(0, Math.min(...pegEvents.map(e => e.price)) - 0.05),
-        max: Math.max(...pegEvents.map(e => e.price)) + 0.05,
+        min: Math.max(0, Math.min(...sortedEvents.map(e => e.price)) - 0.01),
+        max: Math.max(...sortedEvents.map(e => e.price)) + 0.01,
         ticks: {
           callback: function(value) {
-            return '$' + value.toFixed(3);
+            return '$' + value.toFixed(4);
           }
         }
       },
@@ -118,15 +123,17 @@ const PegStabilityChart: React.FC<PegStabilityChartProps> = ({ pegEvents, launch
     },
   };
 
-  // Calculate statistics
-  const maxDeviation = pegEvents.reduce((max, event) => {
+  // Calculate statistics from valid events only
+  const maxDeviation = sortedEvents.reduce((max, event) => {
     const deviation = Math.abs((event.price - 1.0) / 1.0 * 100);
     return deviation > max ? deviation : max;
   }, 0);
 
-  const averageDeviation = pegEvents.reduce((sum, event) => {
-    return sum + Math.abs((event.price - 1.0) / 1.0 * 100);
-  }, 0) / pegEvents.length;
+  const averageDeviation = sortedEvents.length > 0 
+    ? sortedEvents.reduce((sum, event) => {
+        return sum + Math.abs((event.price - 1.0) / 1.0 * 100);
+      }, 0) / sortedEvents.length
+    : 0;
 
   const daysListed = Math.ceil(
     (new Date().getTime() - new Date(launchDate).getTime()) / (1000 * 60 * 60 * 24)
@@ -154,13 +161,13 @@ const PegStabilityChart: React.FC<PegStabilityChartProps> = ({ pegEvents, launch
         <div className="bg-gray-50 p-4 rounded-lg">
           <p className="text-sm text-gray-500 mb-1">Days Since Launch</p>
           <p className="text-xl font-semibold text-gray-900">
-            {daysListed}
+            {isNaN(daysListed) ? 'N/A' : daysListed}
           </p>
         </div>
         <div className="bg-gray-50 p-4 rounded-lg">
           <p className="text-sm text-gray-500 mb-1">Depeg Events</p>
           <p className="text-xl font-semibold text-gray-900">
-            {pegEvents.filter(e => Math.abs((e.price - 1.0) / 1.0 * 100) > 5).length}
+            {sortedEvents.filter(e => Math.abs((e.price - 1.0) / 1.0 * 100) > 5).length}
           </p>
         </div>
       </div>
