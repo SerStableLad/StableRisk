@@ -8,7 +8,7 @@ const cache = new NodeCache({ stdTTL: 3600, checkperiod: 600 }); // Cache for 1 
 const COINGECKO_API = 'https://api.coingecko.com/api/v3';
 const API_KEY = process.env.COINGECKO_API_KEY;
 
-// Configure axios instance for CoinGecko with proper API key header
+// Configure axios instance for CoinGecko
 const coinGeckoClient = axios.create({
   baseURL: COINGECKO_API,
   headers: {
@@ -45,8 +45,17 @@ export async function fetchCoinInfo(ticker) {
     const coinsListResponse = await coinGeckoClient.get('/coins/list');
     const coinsList = coinsListResponse.data;
     
+    // Filter for stablecoins only
+    const stablecoinCategories = [
+      'stablecoins',
+      'algorithmic-stablecoin',
+      'asset-backed-stablecoin',
+      'decentralized-stablecoin'
+    ];
+    
     const coin = coinsList.find(c => 
-      c.symbol.toLowerCase() === ticker.toLowerCase()
+      c.symbol.toLowerCase() === ticker.toLowerCase() &&
+      stablecoinCategories.some(cat => c.categories?.includes(cat))
     );
     
     if (!coin) {
@@ -123,7 +132,10 @@ function determineBlockchain(data) {
     'binance-smart-chain': 'BSC',
     'solana': 'Solana',
     'polygon-pos': 'Polygon',
-    'avalanche': 'Avalanche'
+    'avalanche': 'Avalanche',
+    'tron': 'Tron',
+    'arbitrum-one': 'Arbitrum',
+    'optimistic-ethereum': 'Optimism'
   };
   
   return platformMapping[platform] || platform;
