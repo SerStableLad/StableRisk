@@ -1,6 +1,7 @@
 import axios from 'axios';
 import NodeCache from 'node-cache';
 import dotenv from 'dotenv';
+import { createTimeoutAxios } from '../utils/apiUtils.js';
 
 dotenv.config();
 
@@ -8,16 +9,13 @@ const cache = new NodeCache({ stdTTL: 3600, checkperiod: 600 }); // Cache for 1 
 const COINGECKO_API = 'https://api.coingecko.com/api/v3';
 const API_KEY = process.env.COINGECKO_API_KEY;
 
-// Configure axios instance for CoinGecko with proper API key header
-const coinGeckoClient = axios.create({
+// Configure axios instance for CoinGecko with proper API key header and timeout
+const coinGeckoClient = createTimeoutAxios(axios.create({
   baseURL: COINGECKO_API,
   headers: {
     'x-cg-pro-api-key': API_KEY
-  },
-  timeout: 10000,
-  maxRetries: 3,
-  retryDelay: 1000
-});
+  }
+}));
 
 // Add response interceptor for rate limiting
 coinGeckoClient.interceptors.response.use(null, async error => {
