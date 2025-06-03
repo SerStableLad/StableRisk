@@ -49,14 +49,14 @@ router.get('/:ticker', async (req, res, next) => {
       }
     }
     
-    // If GitHub repo is available, analyze it
+    // If GitHub repo is available, analyze it and get audit history
     let githubData = null;
     let auditHistory = [];
     
     if (coinInfo.github) {
       [githubData, auditHistory] = await Promise.all([
         analyzeGithubRepo(coinInfo.github),
-        getAuditHistory(ticker, coinInfo.name)
+        getAuditHistory(ticker, coinInfo.name, coinInfo.github)
       ]);
     }
     
