@@ -18,18 +18,13 @@ export async function fetchStablecoinRiskReport(ticker: string): Promise<RiskRep
     return response.data;
   } catch (error) {
     if (axios.isAxiosError(error)) {
-      const errorDetails = error.response?.data?.details || '';
-      const errorMessage = error.response?.data?.message || 'Failed to fetch stablecoin data';
-      
       if (error.response?.status === 404) {
-        throw new Error(`${errorMessage}. ${errorDetails}`);
+        throw new Error(`Stablecoin ${ticker} not found`);
       } else if (error.response?.status === 429) {
         throw new Error('API rate limit exceeded. Please try again in a few minutes.');
-      } else if (error.response?.status === 403) {
-        throw new Error('API access denied. Please check API key configuration.');
       }
-      throw new Error(`${errorMessage}. ${errorDetails}`);
+      throw new Error(error.response?.data?.message || 'Failed to fetch stablecoin data');
     }
-    throw new Error('An unexpected error occurred while fetching stablecoin data');
+    throw new Error('An unexpected error occurred');
   }
 }
