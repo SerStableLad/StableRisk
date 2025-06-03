@@ -29,6 +29,30 @@ coinGeckoClient.interceptors.response.use(null, async error => {
   return Promise.reject(error);
 });
 
+// Keywords that indicate a bridged or wrapped token
+const BRIDGE_KEYWORDS = [
+  'bridged',
+  'wrapped',
+  'peg',
+  'bridge',
+  'bsc',
+  'polygon',
+  'avalanche',
+  'arbitrum',
+  'optimism',
+  'bnb',
+  'wormhole',
+  'portal'
+];
+
+/**
+ * Checks if a coin is likely a bridged version
+ */
+function isBridgedToken(coin) {
+  const nameAndId = (coin.name + ' ' + coin.id).toLowerCase();
+  return BRIDGE_KEYWORDS.some(keyword => nameAndId.includes(keyword));
+}
+
 /**
  * Fetches basic coin information from CoinGecko API
  */
@@ -45,11 +69,21 @@ export async function fetchCoinInfo(ticker) {
     const coinsListResponse = await coinGeckoClient.get('/coins/list');
     const coinsList = coinsListResponse.data;
     
+    // Find non-bridged coin matching the ticker
     const coin = coinsList.find(c => 
-      c.symbol.toLowerCase() === ticker.toLowerCase()
+      c.symbol.toLowerCase() === ticker.toLowerCase() && !isBridgedToken(c)
     );
     
+    // If no non-bridged coin found, check if only bridged versions exist
     if (!coin) {
+      const bridgedVersionExists = coinsList.some(c =>
+        c.symbol.toLowerCase() === ticker.toLowerCase() && isBridgedToken(c)
+      );
+
+      if (bridgedVersionExists) {
+        throw new Error(`Only bridged versions of ${ticker} were found. Please search for the native token.`);
+      }
+      
       throw new Error(`Stablecoin ${ticker} not found`);
     }
     
@@ -65,6 +99,10 @@ export async function fetchCoinInfo(ticker) {
       .filter(t => t.target === 'USD' && t.trust_score === 'green')
       .sort((a, b) => b.volume - a.volume)[0]?.market.identifier || '';
     
+    // Extract GitHub repository URLs
+    const githubRepos = data.links?.repos_url?.github || [];
+    const primaryGithubRepo = githubRepos[0] || '';
+    
     // Extract the relevant information
     const coinInfo = {
       id: data.id,
@@ -73,7 +111,7 @@ export async function fetchCoinInfo(ticker) {
       logo: data.image?.large,
       description: data.description?.en?.split('.')[0] || '',
       website: data.links?.homepage?.[0] || '',
-      github: data.links?.repos_url?.github?.[0] || '',
+      github: primaryGithubRepo,
       marketCap: data.market_data?.market_cap?.usd || 0,
       launchDate: data.genesis_date || 'Unknown',
       collateralType: determineCollateralType(data),
